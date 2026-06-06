@@ -25,6 +25,7 @@ export default function App() {
   const [seals, setSeals] = useState([]); // [{ id, blob, type, name, placement, enabled, locked }]
   const [selectedId, setSelectedId] = useState(null);
   const [loadingSeals, setLoadingSeals] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const [pdfs, setPdfs] = useState([]); // [{ id, file, bytes }]
   const [previewId, setPreviewId] = useState(null);
@@ -108,6 +109,7 @@ export default function App() {
 
     setSeals((prev) => [...prev, ...additions]);
     setSelectedId(additions[0].id);
+    setSidebarOpen(true);
     if (valid.length > room) {
       setError(`Added ${room}. Maximum of ${MAX_SEALS} seals reached.`);
     }
@@ -140,6 +142,11 @@ export default function App() {
     setSelectedId(null);
   }
 
+  function pickSeal(id) {
+    setSelectedId(id);
+    setSidebarOpen(true);
+  }
+
   // --- PDF batch --------------------------------------------------------
   async function onPdfsSelected(e) {
     const files = Array.from(e.target.files || []);
@@ -161,10 +168,7 @@ export default function App() {
         const bytes = await file.arrayBuffer();
         added.push({ id: newId(), file, bytes });
       }
-      setPdfs((prev) => {
-        const next = [...prev, ...added];
-        return next;
-      });
+      setPdfs((prev) => [...prev, ...added]);
       setPreviewId((cur) => cur || added[0].id);
     } catch {
       setError('Could not read one of those PDFs.');
@@ -242,282 +246,259 @@ export default function App() {
 
   // --- Render -----------------------------------------------------------
   const enabledSeals = seals.filter((s) => s.enabled);
-  const selected = seals.find((s) => s.id === selectedId) || null;
   const previewPdf = pdfs.find((p) => p.id === previewId) || null;
 
   return (
-    <div className="page">
-      <header className="header">
-        <h1>Digistamp</h1>
-        <p className="tagline">Stamp your seals across every page — in bulk.</p>
-      </header>
+    <div className="app">
+      <main className="main">
+        <header className="header">
+          <h1>Digistamp</h1>
+          <p className="tagline">Stamp your seals across every page — in bulk.</p>
+        </header>
 
-      {error && (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="banner banner-error" role="alert">
+            {error}
+          </div>
+        )}
 
-      {loadingSeals ? (
-        <div className="card muted">Loading…</div>
-      ) : (
-        <div className="workflow">
-          {/* ---------- Seals ---------- */}
-          <section className="card seals-card">
-            <div className="card-head">
-              <div>
-                <div className="section-title">Your seals</div>
-                <div className="muted">
-                  Up to {MAX_SEALS}. Toggle which ones to apply; lock to protect a
-                  seal&apos;s position &amp; size.
-                </div>
-              </div>
-              {seals.length > 0 && (
-                <button className="btn btn-ghost btn-sm" onClick={removeAllSeals}>
-                  Remove all
-                </button>
-              )}
+        {/* ---------- PDF preview + batch ---------- */}
+        {pdfs.length === 0 ? (
+          <div className="dropzone" onClick={() => pdfInputRef.current?.click()}>
+            <div className="dropzone-icon">📄</div>
+            <div className="dropzone-title">Upload PDFs</div>
+            <div className="muted">
+              Select one or more files. They&apos;ll all be sealed at once.
             </div>
-
-            <div className="seals-layout">
-              <div className="seals-main">
-                <div className="seal-grid">
-                  {seals.map((s) => (
-                    <SealCard
-                      key={s.id}
-                      seal={s}
-                      url={sealUrls[s.id]}
-                      selected={s.id === selectedId}
-                      onSelect={() => setSelectedId(s.id)}
-                      onToggleEnabled={() => updateSeal(s.id, { enabled: !s.enabled })}
-                      onToggleLocked={() => updateSeal(s.id, { locked: !s.locked })}
-                      onRemove={() => removeSeal(s.id)}
-                    />
-                  ))}
-
-                  {seals.length < MAX_SEALS && (
-                    <button
-                      className="seal-card seal-add"
-                      onClick={() => sealInputRef.current?.click()}
-                    >
-                      <span className="seal-add-plus">＋</span>
-                      <span>Add seal</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Adjustment sliders — pinned to the top-right */}
-              <aside className="controls-panel">
-                <div className="controls-panel-head">
-                  <span className="controls-panel-title">Adjust</span>
-                  {selected?.locked && <span className="lock-pill">🔒</span>}
-                </div>
-                {selected ? (
-                  <>
-                    <div className="controls-target" title={selected.name}>
-                      {selected.name}
-                    </div>
-                    <Controls
-                      placement={selected.placement}
-                      disabled={selected.locked}
-                      onChange={(key, value) => updatePlacement(selected.id, key, value)}
-                    />
-                  </>
-                ) : (
-                  <p className="muted controls-empty">
-                    Select a seal to adjust its position &amp; size.
-                  </p>
-                )}
-              </aside>
-            </div>
-
-            <input
-              ref={sealInputRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              multiple
-              hidden
-              onChange={onSealsSelected}
+          </div>
+        ) : (
+          <>
+            <Preview
+              pdfBytes={previewPdf?.bytes}
+              seals={enabledSeals}
+              sealUrls={sealUrls}
+              selectedId={selectedId}
+              onPickSeal={pickSeal}
             />
-          </section>
 
-          {/* ---------- PDFs (batch) ---------- */}
-          {seals.length > 0 && (
-            <section className="card">
-              <div className="card-head">
-                <div>
-                  <div className="section-title">Documents</div>
-                  <div className="muted">
-                    Add one or many PDFs — they&apos;ll all be sealed at once.
-                  </div>
-                </div>
-                {pdfs.length > 0 && (
-                  <button className="btn btn-ghost" onClick={resetPdfs}>
-                    Clear
-                  </button>
-                )}
+            <div className="doc-bar">
+              <div className="doc-strip">
+                {pdfs.map((p) => (
+                  <span
+                    key={p.id}
+                    className={`doc-chip ${p.id === previewId ? 'is-active' : ''}`}
+                  >
+                    <button className="doc-chip-name" onClick={() => setPreviewId(p.id)}>
+                      📄 {p.file.name}
+                    </button>
+                    <button
+                      className="icon-btn"
+                      onClick={() => removePdf(p.id)}
+                      aria-label="Remove PDF"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+                <button
+                  className="doc-chip doc-add"
+                  onClick={() => pdfInputRef.current?.click()}
+                >
+                  ＋ Add
+                </button>
               </div>
+              <button className="btn btn-ghost btn-sm" onClick={resetPdfs}>
+                Clear
+              </button>
+            </div>
 
-              {pdfs.length === 0 ? (
-                <div className="dropzone" onClick={() => pdfInputRef.current?.click()}>
-                  <div className="dropzone-icon">📄</div>
-                  <div className="dropzone-title">Upload PDFs</div>
-                  <div className="muted">Select one or more files.</div>
-                </div>
+            <div className="actions">
+              {status !== 'done' ? (
+                <button
+                  className="btn btn-primary"
+                  onClick={onGenerate}
+                  disabled={status === 'generating' || enabledSeals.length === 0}
+                >
+                  {status === 'generating'
+                    ? `Sealing ${progress.done} of ${progress.total}…`
+                    : `Seal ${pdfs.length} PDF${pdfs.length > 1 ? 's' : ''}`}
+                </button>
               ) : (
                 <>
-                  <ul className="pdf-list">
-                    {pdfs.map((p) => (
-                      <li
-                        key={p.id}
-                        className={`pdf-item ${p.id === previewId ? 'is-preview' : ''}`}
-                      >
-                        <button
-                          className="pdf-name"
-                          onClick={() => setPreviewId(p.id)}
-                          title="Preview this PDF"
-                        >
-                          📄 {p.file.name}
-                        </button>
-                        <button
-                          className="icon-btn"
-                          onClick={() => removePdf(p.id)}
-                          aria-label="Remove"
-                        >
-                          ✕
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    className="btn btn-ghost add-more"
-                    onClick={() => pdfInputRef.current?.click()}
-                  >
-                    ＋ Add more PDFs
+                  <button className="btn btn-primary" onClick={downloadAll}>
+                    Download all
+                  </button>
+                  <button className="btn btn-ghost" onClick={() => setStatus('idle')}>
+                    Adjust &amp; redo
                   </button>
                 </>
               )}
+            </div>
 
-              <input
-                ref={pdfInputRef}
-                type="file"
-                accept="application/pdf"
-                multiple
-                hidden
-                onChange={onPdfsSelected}
-              />
+            {enabledSeals.length === 0 && (
+              <p className="muted hint">
+                Enable at least one seal in the panel to continue.
+              </p>
+            )}
 
-              {previewPdf && (
-                <Preview
-                  pdfBytes={previewPdf.bytes}
-                  seals={enabledSeals}
-                  sealUrls={sealUrls}
-                  selectedId={selectedId}
-                  onPickSeal={setSelectedId}
-                />
-              )}
-
-              {pdfs.length > 0 && (
-                <div className="actions">
-                  {status !== 'done' ? (
-                    <button
-                      className="btn btn-primary"
-                      onClick={onGenerate}
-                      disabled={status === 'generating' || enabledSeals.length === 0}
-                    >
-                      {status === 'generating'
-                        ? `Sealing ${progress.done} of ${progress.total}…`
-                        : `Seal ${pdfs.length} PDF${pdfs.length > 1 ? 's' : ''}`}
-                    </button>
-                  ) : (
-                    <>
-                      <button className="btn btn-primary" onClick={downloadAll}>
-                        Download all
-                      </button>
-                      <button className="btn btn-ghost" onClick={() => setStatus('idle')}>
-                        Adjust &amp; redo
-                      </button>
-                    </>
-                  )}
+            {status === 'done' && (
+              <div className="results">
+                <div className="banner banner-success">
+                  Done — {results.length} PDF{results.length > 1 ? 's' : ''} sealed on every
+                  page.
                 </div>
-              )}
+                <ul className="result-list">
+                  {results.map((r) => (
+                    <li key={r.id} className="result-item">
+                      <span className="result-name" title={r.name}>
+                        {r.name}
+                      </span>
+                      <a className="btn btn-ghost btn-sm" href={r.url} download={r.name}>
+                        Download
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
 
-              {enabledSeals.length === 0 && pdfs.length > 0 && (
-                <div className="muted hint">Enable at least one seal to continue.</div>
-              )}
+        <input
+          ref={pdfInputRef}
+          type="file"
+          accept="application/pdf"
+          multiple
+          hidden
+          onChange={onPdfsSelected}
+        />
+      </main>
 
-              {status === 'done' && (
-                <div className="results">
-                  <div className="banner banner-success">
-                    Done — {results.length} PDF{results.length > 1 ? 's' : ''} sealed on every
-                    page.
-                  </div>
-                  <ul className="result-list">
-                    {results.map((r) => (
-                      <li key={r.id} className="result-item">
-                        <span className="result-name" title={r.name}>
-                          {r.name}
-                        </span>
-                        <a className="btn btn-ghost btn-sm" href={r.url} download={r.name}>
-                          Download
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </section>
-          )}
-        </div>
+      {/* ---------- Collapsible seals sidebar ---------- */}
+      {!sidebarOpen && (
+        <button className="sidebar-reopen" onClick={() => setSidebarOpen(true)}>
+          Seals{seals.length ? ` (${seals.length})` : ''}
+        </button>
       )}
 
-      <footer className="footer">
-        Everything stays on your device. Your seals are remembered between visits.
-      </footer>
+      <aside className={`sidebar ${sidebarOpen ? '' : 'is-collapsed'}`}>
+        <div className="sidebar-head">
+          <span className="sidebar-title">Seals</span>
+          <button
+            className="icon-btn"
+            onClick={() => setSidebarOpen(false)}
+            aria-label="Collapse panel"
+            title="Collapse"
+          >
+            ›
+          </button>
+        </div>
+        <p className="muted sidebar-sub">
+          Up to {MAX_SEALS}. Tick which to apply; lock to protect a seal&apos;s position &amp;
+          size.
+        </p>
+
+        {loadingSeals ? (
+          <p className="muted">Loading…</p>
+        ) : (
+          <div className="seal-list">
+            {seals.map((s) => (
+              <SealItem
+                key={s.id}
+                seal={s}
+                url={sealUrls[s.id]}
+                selected={s.id === selectedId}
+                onSelect={() => setSelectedId(s.id)}
+                onToggleEnabled={() => updateSeal(s.id, { enabled: !s.enabled })}
+                onToggleLocked={() => updateSeal(s.id, { locked: !s.locked })}
+                onRemove={() => removeSeal(s.id)}
+                onChangePlacement={(key, value) => updatePlacement(s.id, key, value)}
+              />
+            ))}
+
+            {seals.length < MAX_SEALS && (
+              <button className="seal-add" onClick={() => sealInputRef.current?.click()}>
+                <span className="seal-add-plus">＋</span> Add seal
+              </button>
+            )}
+          </div>
+        )}
+
+        {seals.length > 0 && (
+          <button className="btn btn-ghost btn-sm remove-all" onClick={removeAllSeals}>
+            Remove all seals
+          </button>
+        )}
+
+        <input
+          ref={sealInputRef}
+          type="file"
+          accept="image/png,image/jpeg"
+          multiple
+          hidden
+          onChange={onSealsSelected}
+        />
+      </aside>
     </div>
   );
 }
 
-function SealCard({ seal, url, selected, onSelect, onToggleEnabled, onToggleLocked, onRemove }) {
+function SealItem({
+  seal,
+  url,
+  selected,
+  onSelect,
+  onToggleEnabled,
+  onToggleLocked,
+  onRemove,
+  onChangePlacement,
+}) {
   return (
     <div
-      className={`seal-card ${selected ? 'is-selected' : ''} ${
+      className={`seal-item ${selected ? 'is-selected' : ''} ${
         seal.enabled ? '' : 'is-disabled'
       }`}
-      onClick={onSelect}
     >
-      <div className="seal-card-top">
+      <div className="seal-item-row" onClick={onSelect}>
         <label className="checkbox" onClick={(e) => e.stopPropagation()}>
           <input type="checkbox" checked={seal.enabled} onChange={onToggleEnabled} />
         </label>
-        <div className="seal-card-actions">
-          <button
-            className={`icon-btn ${seal.locked ? 'is-on' : ''}`}
-            title={seal.locked ? 'Unlock position & size' : 'Lock position & size'}
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleLocked();
-            }}
-          >
-            {seal.locked ? '🔒' : '🔓'}
-          </button>
-          <button
-            className="icon-btn"
-            title="Remove seal"
-            onClick={(e) => {
-              e.stopPropagation();
-              onRemove();
-            }}
-          >
-            ✕
-          </button>
+        <div className="seal-item-thumb">{url && <img src={url} alt={seal.name} />}</div>
+        <div className="seal-item-name" title={seal.name}>
+          {seal.name}
         </div>
+        <button
+          className={`icon-btn ${seal.locked ? 'is-on' : ''}`}
+          title={seal.locked ? 'Unlock position & size' : 'Lock position & size'}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLocked();
+          }}
+        >
+          {seal.locked ? '🔒' : '🔓'}
+        </button>
+        <button
+          className="icon-btn"
+          title="Remove seal"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          ✕
+        </button>
       </div>
-      <div className="seal-card-thumb">{url && <img src={url} alt={seal.name} />}</div>
-      <div className="seal-card-name" title={seal.name}>
-        {seal.name}
-      </div>
+
+      {selected && (
+        <div className="seal-controls">
+          {seal.locked && <div className="locked-note">🔒 Locked — unlock to adjust.</div>}
+          <Controls
+            placement={seal.placement}
+            disabled={seal.locked}
+            onChange={onChangePlacement}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -570,6 +551,7 @@ function Preview({ pdfBytes, seals, sealUrls, selectedId, onPickSeal }) {
   const [dims, setDims] = useState(null);
 
   useEffect(() => {
+    if (!pdfBytes) return;
     let cancelled = false;
     let renderTask = null;
     (async () => {
@@ -578,8 +560,8 @@ function Preview({ pdfBytes, seals, sealUrls, selectedId, onPickSeal }) {
         const pdfPage = await doc.getPage(1);
         if (cancelled) return;
         const viewport = pdfPage.getViewport({ scale: 1 });
-        const maxW = 480;
-        const scale = Math.min(maxW / viewport.width, 1.4);
+        const maxW = 620;
+        const scale = Math.min(maxW / viewport.width, 2);
         const scaled = pdfPage.getViewport({ scale });
         const canvas = canvasRef.current;
         if (!canvas) return;
@@ -603,7 +585,7 @@ function Preview({ pdfBytes, seals, sealUrls, selectedId, onPickSeal }) {
 
   return (
     <div className="preview">
-      <div className="preview-stage" style={dims ? { width: dims.w } : undefined}>
+      <div className="preview-stage" style={dims ? { maxWidth: dims.w } : undefined}>
         <canvas ref={canvasRef} className="preview-canvas" />
         {dims &&
           seals.map((s) => (
@@ -623,7 +605,7 @@ function Preview({ pdfBytes, seals, sealUrls, selectedId, onPickSeal }) {
           ))}
       </div>
       <p className="muted preview-hint">
-        Preview of page 1 — seals land the same on every page. Tap a seal to adjust it.
+        Page 1 preview — seals land the same on every page. Click a seal to adjust it.
       </p>
     </div>
   );

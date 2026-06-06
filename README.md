@@ -37,7 +37,7 @@ Everything runs locally in your browser. No accounts, no servers, no uploads.
 | PDF stamping       | [`pdf-lib`](https://pdf-lib.js.org/)              |
 | PDF preview render | [`pdfjs-dist`](https://mozilla.github.io/pdf.js/) |
 | Local storage      | IndexedDB (raw, no wrapper library)               |
-| Styling            | Plain CSS — Notion-style minimal + soft neumorphism |
+| Styling            | Plain CSS — flat, minimal, Notion-style           |
 
 All processing happens in the browser.
 
