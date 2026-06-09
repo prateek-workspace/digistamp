@@ -10,11 +10,12 @@ const SEAL_TYPES = ['image/png', 'image/jpeg', 'image/jpg'];
 const MAX_SEALS = 4;
 
 // Staggered defaults so freshly added seals don't all land in the same spot.
+// Users can still freely adjust each seal's position and size afterwards.
 const DEFAULT_PLACEMENTS = [
-  { xPct: 80, yPct: 85, sizePct: 18 },
-  { xPct: 20, yPct: 85, sizePct: 18 },
-  { xPct: 80, yPct: 15, sizePct: 18 },
-  { xPct: 20, yPct: 15, sizePct: 18 },
+  { xPct: 45, yPct: 85, sizePct: 20 },
+  { xPct: 60, yPct: 85, sizePct: 20 },
+  { xPct: 80, yPct: 85, sizePct: 20 },
+  { xPct: 70, yPct: 90, sizePct: 20 },
 ];
 
 function newId() {
